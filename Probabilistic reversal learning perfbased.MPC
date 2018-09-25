@@ -1,0 +1,156 @@
+\Reversal learning, reversal after 8 responses at active nosepokes
+\Written by Jeroen Verharen
+
+\This section is for inputs
+^LeftLever = 1
+^RightLever = 2
+^Receptical = 3
+
+
+\This section is for outputs
+^LeftLever = 1
+^RightLever = 2
+^Fan = 3
+^Pellet = 4
+^House = 7
+^Tone = 6
+^LeftCue =  5
+^RightCue =  8
+
+
+
+\DEFINED VARIABLES
+\A = trial number
+\B = randomized side (1 or 2)
+\C = high-probability lever; 0 = left, 1 = right
+\D = outcome left lever if chosen; 0 = time-out, 1 = rewarded
+\E = outcome right lever if chosen
+
+\K = total rewards
+\L = total time-outs
+
+
+\F = vector with high-probability lever per trial; 0 = left, 1 = right
+\G = vector with outcome of lever; 0 = time-out, 1 = rewarded
+\H = vector with choice; 0 = left, 1 = right
+\I = vector with trial start time
+\J = vector with response time
+
+\M = MINUTES
+\X = CORRECT RESPONSES ON A ROW
+\N = SESSION TIMER
+\R = left lever presses total
+\Y = right lever presses total
+\Q = REVERSALS
+
+\Training parameters
+
+VAR_ALIAS Fixed ratio = X
+VAR_ALIAS Time Session = M
+VAR_ALIAS Maximum rewards = Q
+
+\Z-pulses
+\Z1 = start trial
+\Z2 = give reward
+\Z3 = give time-out
+\Z4 = end trial
+
+DISKCOLUMNS = 1
+
+LIST U = 1, 2                             \counter-balance starting lever
+LIST V = 1, 1, 1, 1, 1, 1, 1, 1, 0, 0     \rewarding lever
+LIST W = 0, 0, 0, 0, 0, 0, 0, 0, 1, 1     \less rewarding lever
+
+DIM F = 1000
+DIM G = 1000
+DIM H = 1000
+DIM I = 1000
+DIM J = 1000
+
+
+
+
+S.S.1,    \Main control logic
+S1,
+  #START: SET X = 0; SET M = 90; RandI B = U ---> S2
+S2,
+  0.001": ADD A; SHOW 2, TRIALNO, A; Z1 ---> S3
+S3,
+  0.1": ON ^LeftLever, ^RightLever, ^House; SET I(A) = n/100  ---> S4
+S4,
+  #R^LeftLever: ADD R; SHOW 5, LEFT, R; OFF ^LeftLever, ^RightLever, ^House; ---> S5
+  #R^RightLever: ADD Y; SHOW 10, RIGHT, Y; OFF ^LeftLever, ^RightLever, ^House; ---> S6
+S5,
+  0": If D = 1 [@true, @false]
+                 @true: SET H(A) = 0; Z2 ---> S7
+                 @false: SET H(A) = 0; Z3 ---> S7
+S6,
+  0": If E = 1 [@true, @false]
+                 @true: SET H(A) = 1; Z2 ---> S7
+                 @false: SET H(A) = 1; Z3 ---> S7
+
+S7,
+ #Z4: ---> S2
+
+
+
+
+
+
+S.S.2,   \Give reward
+S1,
+  #Z2: ADD K; SHOW 3, REWARDS, K; SET G(A) = 1; SET J(A) = n/100; ON ^Pellet, ^Tone, ^LeftCue, ^RightCue ---> S2
+S2,
+  0.5": OFF ^Tone ---> S3
+S3,
+  #R^Receptical: OFF ^Pellet, ^LeftCue, ^RightCue; Z4 ---> S1
+
+
+
+
+
+S.S.3,   \Give time-out
+S1,
+  #Z3: ADD L; SHOW 4, TIME-OUTS, L; SET G(A) = 0; SET J(A) = n/100; OFF ^LeftCue, ^RightCue ---> S2
+S2,
+  10": Z4 ---> S1
+
+
+
+
+
+S.S.4,   \Count trials and do reversals if B=0 [left starts as high prob lever]
+S1,
+  #Z1: SET F(A) = B ---> S2
+S2,
+  0": IF (B = 1) [@true, @false]
+                  @true: RandI D = V; RandI E = W; ---> S3
+                  @false: RandI D = W; RandI E = V; ---> S3
+S3,
+  #R^LeftLever: IF (B = 1) [@true, @false]
+                  @true: SET X = X + 1; ---> S4
+                  @false: SET X = 0; ---> S4
+  #R^RightLever: IF (B = 2) [@true, @false]
+                  @true: SET X = X + 1; ---> S4
+                  @false: SET X = 0; ---> S4
+S4,
+  0": IF (X = 8) [@true, @false]
+                  @true: SET X = 0; ADD Q; SHOW 9, REVERSALS, Q ---> S5
+                  @false: ---> S1
+S5,
+  0": IF (B = 1) [@true, @false]
+                  @true: SET B = 2; ---> S1
+                  @false: SET B = 1; ---> S1
+
+
+
+S.S.6,    \Session Timer
+S1,
+  #START: SHOW 1,Sess_n,N ---> S2
+
+S2,
+  0.01": ADD N; SHOW 1, Sess_n,N/100;
+      IF ((N/100) > 5400) [@True, @False]
+                         \As long as session time < M we will continue
+               @True: ---> STOPABORTFLUSH
+               @False: ---> SX
